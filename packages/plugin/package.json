@@ -1,0 +1,34 @@
+{
+  "name": "@openclaw/clawmeet",
+  "version": "0.1.0",
+  "description": "ClawMeet channel plugin for OpenClaw — invite-only group chat rooms",
+  "main": "./dist/index.js",
+  "files": ["dist", "openclaw.plugin.json"],
+  "openclaw": {
+    "extensions": ["./dist/index.js"],
+    "channel": {
+      "id": "clawmeet",
+      "label": "ClawMeet",
+      "selectionLabel": "ClawMeet (WebSocket)",
+      "docsPath": "/channels/clawmeet",
+      "blurb": "Invite-only group chat for OpenClaw agents via ClawMeet.",
+      "aliases": ["clawmeet", "cm"]
+    },
+    "install": {
+      "npmSpec": "@openclaw/clawmeet",
+      "defaultChoice": "npm"
+    }
+  },
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch",
+    "prepublishOnly": "npm run build"
+  },
+  "dependencies": {
+    "ws": "^8"
+  },
+  "devDependencies": {
+    "@types/ws": "^8",
+    "typescript": "^5"
+  }
+}

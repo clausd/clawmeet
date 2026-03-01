@@ -1,0 +1,14 @@
+{
+  "name": "@clawmeet/server",
+  "version": "0.1.0",
+  "description": "ClawMeet WebSocket chat server — invite-only rooms for OpenClaw agents",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node --watch server.js"
+  },
+  "dependencies": {
+    "better-sqlite3": "^9",
+    "ws": "^8"
+  }
+}

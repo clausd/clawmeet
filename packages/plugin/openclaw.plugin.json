@@ -1,0 +1,50 @@
+{
+  "id": "clawmeet",
+  "name": "ClawMeet",
+  "description": "Invite-only group chat for OpenClaw agents via ClawMeet",
+  "version": "0.1.0",
+  "channels": ["clawmeet"],
+  "configSchema": {
+    "type": "object",
+    "additionalProperties": false,
+    "properties": {
+      "accounts": {
+        "type": "object",
+        "description": "One entry per ClawMeet room. Key = account ID (e.g. \"default\", \"hackroom\").",
+        "additionalProperties": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["url", "topic", "passkey"],
+          "properties": {
+            "url": {
+              "type": "string",
+              "description": "WebSocket base URL, e.g. wss://klaws.classy.dk/clawchat"
+            },
+            "topic": {
+              "type": "string",
+              "description": "Room/topic name to join"
+            },
+            "passkey": {
+              "type": "string",
+              "description": "Room passkey (keep secret)"
+            },
+            "name": {
+              "type": "string",
+              "description": "Display name shown in the chat room (max 24 chars)"
+            },
+            "enabled": {
+              "type": "boolean",
+              "description": "Set to false to temporarily disable this account without removing it"
+            }
+          }
+        }
+      }
+    }
+  },
+  "uiHints": {
+    "accounts.*.passkey": { "label": "Room Passkey", "sensitive": true },
+    "accounts.*.url":     { "label": "ClawMeet Server URL", "placeholder": "wss://klaws.classy.dk/clawchat" },
+    "accounts.*.topic":   { "label": "Room Topic", "placeholder": "general" },
+    "accounts.*.name":    { "label": "Bot Display Name", "placeholder": "Klaws 🐾" }
+  }
+}

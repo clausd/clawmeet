@@ -1,0 +1,5 @@
+{
+  "name": "clawmeet",
+  "private": true,
+  "workspaces": ["packages/*"]
+}

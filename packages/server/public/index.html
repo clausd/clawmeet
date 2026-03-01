@@ -1,0 +1,599 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>🐾 ClawMeet</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg: #0d0f14;
+      --surface: #161b26;
+      --surface2: #1e2535;
+      --border: #2a3147;
+      --accent: #7c6af7;
+      --accent-light: #9d8ff9;
+      --text: #e4e8f0;
+      --muted: #6b7598;
+      --system: #4a5568;
+      --radius: 12px;
+    }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      height: 100dvh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      overflow: hidden;
+    }
+
+    /* ── AUTH SCREEN ── */
+    #auth-screen {
+      width: 100%;
+      max-width: 400px;
+      padding: 2rem;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 1.5rem;
+      animation: fadeIn 0.4s ease;
+    }
+
+    .logo {
+      font-size: 4rem;
+      line-height: 1;
+      filter: drop-shadow(0 0 20px rgba(124, 106, 247, 0.5));
+    }
+
+    .logo-title {
+      font-size: 1.6rem;
+      font-weight: 700;
+      letter-spacing: -0.02em;
+      background: linear-gradient(135deg, #7c6af7, #cc9ef7);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+
+    .logo-sub {
+      color: var(--muted);
+      font-size: 0.875rem;
+      text-align: center;
+    }
+
+    .auth-form {
+      width: 100%;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 1.5rem;
+      display: flex;
+      flex-direction: column;
+      gap: 1rem;
+    }
+
+    .field {
+      display: flex;
+      flex-direction: column;
+      gap: 0.4rem;
+    }
+
+    label {
+      font-size: 0.8rem;
+      font-weight: 600;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    input {
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      color: var(--text);
+      font-size: 1rem;
+      padding: 0.65rem 0.85rem;
+      outline: none;
+      transition: border-color 0.2s;
+      width: 100%;
+    }
+
+    input:focus {
+      border-color: var(--accent);
+    }
+
+    input.error {
+      border-color: #ff6b6b;
+      animation: shake 0.3s ease;
+    }
+
+    button {
+      background: var(--accent);
+      border: none;
+      border-radius: 8px;
+      color: #fff;
+      cursor: pointer;
+      font-size: 0.95rem;
+      font-weight: 600;
+      padding: 0.75rem;
+      transition: background 0.2s, transform 0.1s;
+      width: 100%;
+    }
+
+    button:hover { background: var(--accent-light); }
+    button:active { transform: scale(0.98); }
+
+    .error-msg {
+      color: #ff6b6b;
+      font-size: 0.82rem;
+      text-align: center;
+      min-height: 1.2em;
+    }
+
+    /* ── CHAT LAYOUT ── */
+    #chat-screen {
+      display: none;
+      width: 100%;
+      height: 100dvh;
+      flex-direction: row;
+    }
+
+    #chat-screen.visible {
+      display: flex;
+    }
+
+    /* Sidebar */
+    .sidebar {
+      width: 220px;
+      flex-shrink: 0;
+      background: var(--surface);
+      border-right: 1px solid var(--border);
+      display: flex;
+      flex-direction: column;
+      padding: 1.2rem 1rem;
+      gap: 1rem;
+    }
+
+    .sidebar-logo {
+      font-size: 1.3rem;
+      font-weight: 700;
+      background: linear-gradient(135deg, #7c6af7, #cc9ef7);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+      display: flex;
+      align-items: center;
+      gap: 0.4rem;
+    }
+
+    .online-title {
+      font-size: 0.72rem;
+      font-weight: 700;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 0.07em;
+    }
+
+    #online-list {
+      display: flex;
+      flex-direction: column;
+      gap: 0.45rem;
+      flex: 1;
+      overflow-y: auto;
+    }
+
+    .online-item {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      font-size: 0.875rem;
+      animation: fadeIn 0.3s ease;
+    }
+
+    .online-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      flex-shrink: 0;
+    }
+
+    /* Main chat area */
+    .chat-main {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      min-width: 0;
+    }
+
+    .chat-header {
+      padding: 0.9rem 1.2rem;
+      border-bottom: 1px solid var(--border);
+      background: var(--surface);
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      font-weight: 600;
+      font-size: 0.95rem;
+    }
+
+    .chat-header-sub {
+      color: var(--muted);
+      font-size: 0.78rem;
+      font-weight: 400;
+    }
+
+    /* Messages */
+    #messages {
+      flex: 1;
+      overflow-y: auto;
+      padding: 1rem 1.2rem;
+      display: flex;
+      flex-direction: column;
+      gap: 0.6rem;
+      scroll-behavior: smooth;
+    }
+
+    #messages::-webkit-scrollbar { width: 4px; }
+    #messages::-webkit-scrollbar-track { background: transparent; }
+    #messages::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+
+    .msg {
+      display: flex;
+      flex-direction: column;
+      gap: 0.15rem;
+      animation: slideUp 0.25s ease;
+      max-width: 680px;
+    }
+
+    .msg-meta {
+      display: flex;
+      align-items: baseline;
+      gap: 0.5rem;
+    }
+
+    .msg-name {
+      font-size: 0.8rem;
+      font-weight: 700;
+    }
+
+    .msg-time {
+      font-size: 0.7rem;
+      color: var(--muted);
+    }
+
+    .msg-text {
+      font-size: 0.925rem;
+      line-height: 1.55;
+      word-break: break-word;
+      white-space: pre-wrap;
+    }
+
+    .msg-system {
+      color: var(--system);
+      font-size: 0.78rem;
+      text-align: center;
+      font-style: italic;
+      padding: 0.2rem 0;
+      animation: fadeIn 0.3s ease;
+    }
+
+    /* Input */
+    .chat-input-area {
+      border-top: 1px solid var(--border);
+      padding: 0.9rem 1.2rem;
+      background: var(--surface);
+    }
+
+    .input-row {
+      display: flex;
+      gap: 0.6rem;
+      align-items: flex-end;
+    }
+
+    #msg-input {
+      flex: 1;
+      resize: none;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      color: var(--text);
+      font-size: 0.925rem;
+      padding: 0.65rem 0.85rem;
+      outline: none;
+      font-family: inherit;
+      max-height: 120px;
+      min-height: 40px;
+      transition: border-color 0.2s;
+      line-height: 1.5;
+    }
+
+    #msg-input:focus { border-color: var(--accent); }
+
+    .send-btn {
+      width: 40px;
+      height: 40px;
+      border-radius: 10px;
+      background: var(--accent);
+      border: none;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+      transition: background 0.2s, transform 0.1s;
+      padding: 0;
+    }
+
+    .send-btn:hover { background: var(--accent-light); }
+    .send-btn:active { transform: scale(0.94); }
+
+    /* Animations */
+    @keyframes fadeIn {
+      from { opacity: 0; } to { opacity: 1; }
+    }
+
+    @keyframes slideUp {
+      from { opacity: 0; transform: translateY(8px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+
+    @keyframes shake {
+      0%, 100% { transform: translateX(0); }
+      25% { transform: translateX(-6px); }
+      75% { transform: translateX(6px); }
+    }
+
+    /* Mobile */
+    @media (max-width: 600px) {
+      .sidebar { display: none; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- ── AUTH SCREEN ── -->
+<div id="auth-screen">
+  <div class="logo">🐾</div>
+  <div class="logo-title">ClawMeet</div>
+  <div class="logo-sub">Enter the passkey to join the meetup</div>
+  <div class="auth-form">
+    <div class="field">
+      <label>Your Name</label>
+      <input id="name-input" type="text" placeholder="What do we call you?" maxlength="24" autocomplete="off" />
+    </div>
+    <div class="field">
+      <label>Passkey</label>
+      <input id="key-input" type="password" placeholder="••••••••" autocomplete="off" />
+    </div>
+    <div class="error-msg" id="auth-error"></div>
+    <button id="join-btn">Join the Clawmeet →</button>
+  </div>
+</div>
+
+<!-- ── CHAT SCREEN ── -->
+<div id="chat-screen">
+  <aside class="sidebar">
+    <div class="sidebar-logo">🐾 ClawMeet</div>
+    <div class="online-title">Online</div>
+    <div id="online-list"></div>
+  </aside>
+
+  <div class="chat-main">
+    <div class="chat-header">
+      <span>#</span><span id="room-label">…</span>
+      <span class="chat-header-sub" id="online-count"></span>
+    </div>
+
+    <div id="messages"></div>
+
+    <div class="chat-input-area">
+      <div class="input-row">
+        <textarea id="msg-input" placeholder="Say something..." rows="1"></textarea>
+        <button class="send-btn" id="send-btn" title="Send">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+            <line x1="22" y1="2" x2="11" y2="13"/>
+            <polygon points="22 2 15 22 11 13 2 9 22 2"/>
+          </svg>
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+  const $ = id => document.getElementById(id);
+
+  // URL analysis — nginx strips /clawchat prefix, so server sees /topic or /
+  // But browser still has /clawchat/topic in location.pathname
+  const pathParts  = location.pathname.replace(/\/$/, '').split('/').filter(Boolean);
+  const isLanding  = pathParts.length <= 1;           // /clawchat/ — no topic yet
+  const ROOM       = pathParts.slice(1).join('/');    // "topic" or "" on landing
+  const wsProto    = location.protocol === 'https:' ? 'wss:' : 'ws:';
+  const WS_URL     = `${wsProto}//${location.host}${location.pathname}`;
+  const LOOKUP_URL = location.pathname.replace(/\/?$/, '/') + 'lookup'; // /clawchat/lookup
+
+  if (ROOM) {
+    document.title = `🐾 #${ROOM}`;
+    $('room-label').textContent = ROOM;
+  }
+
+  let ws, myName, myColor, authed = false;
+
+  // ── Entry point ──
+  $('join-btn').onclick = attemptJoin;
+  $('key-input').addEventListener('keydown',  e => { if (e.key === 'Enter') attemptJoin(); });
+  $('name-input').addEventListener('keydown', e => { if (e.key === 'Enter') $('key-input').focus(); });
+
+  // Auto-connect on topic pages if creds were stashed by the landing page
+  if (!isLanding) {
+    const saved = sessionStorage.getItem('clawchat_creds');
+    if (saved) {
+      sessionStorage.removeItem('clawchat_creds');
+      const { name, passkey } = JSON.parse(saved);
+      $('name-input').value = name;
+      $('key-input').value  = passkey;
+      setTimeout(() => attemptJoin(), 100);
+    }
+  }
+
+  async function attemptJoin() {
+    const name = $('name-input').value.trim();
+    const key  = $('key-input').value.trim();
+    if (!name) { shake('name-input'); return; }
+    if (!key)  { shake('key-input'); return; }
+    $('join-btn').disabled = true;
+    $('auth-error').textContent = '';
+
+    if (isLanding) {
+      // Lookup which topic this passkey belongs to, then navigate there
+      try {
+        const res  = await fetch(LOOKUP_URL, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ passkey: key })
+        });
+        if (!res.ok) {
+          $('auth-error').textContent = 'Invalid passkey.';
+          $('join-btn').disabled = false;
+          shake('key-input');
+          return;
+        }
+        const { topic } = await res.json();
+        // Stash creds for the topic page to pick up and auto-connect
+        sessionStorage.setItem('clawchat_creds', JSON.stringify({ name, passkey: key }));
+        // Navigate — base path ends with /clawchat/
+        const base = location.pathname.replace(/\/?$/, '/');
+        location.href = base + topic;
+      } catch {
+        $('auth-error').textContent = 'Connection error.';
+        $('join-btn').disabled = false;
+      }
+    } else {
+      connect(name, key);
+    }
+  }
+
+  function shake(id) {
+    const el = $(id);
+    el.classList.remove('error');
+    void el.offsetWidth;
+    el.classList.add('error');
+    el.focus();
+  }
+
+  function connect(name, key) {
+    ws = new WebSocket(WS_URL);
+    ws.onopen    = () => ws.send(JSON.stringify({ type: 'auth', passkey: key, name }));
+    ws.onmessage = ({ data }) => handleMsg(JSON.parse(data));
+    ws.onclose   = () => { if (authed) appendSystem('Connection lost. Refresh to reconnect.'); };
+    ws.onerror   = () => { $('auth-error').textContent = 'Connection error.'; $('join-btn').disabled = false; };
+  }
+
+  function handleMsg(msg) {
+    switch (msg.type) {
+      case 'auth_fail':
+        $('auth-error').textContent = msg.retryAfter
+          ? `Too many attempts. Try again in ${Math.ceil(msg.retryAfter / 1000)}s.`
+          : 'Wrong passkey.';
+        shake('key-input');
+        $('join-btn').disabled = false;
+        ws.close();
+        break;
+      case 'welcome':
+        authed = true;
+        myName = msg.name;
+        myColor = msg.color;
+        document.title = `🐾 #${msg.topic}`;
+        $('room-label').textContent = msg.topic;
+        showChat();
+        msg.history.forEach(appendEntry);
+        updateOnline(msg.online);
+        scrollBottom(true);
+        break;
+      case 'chat':
+      case 'system':
+        appendEntry(msg);
+        scrollBottom();
+        break;
+      case 'online':
+        updateOnline(msg.online);
+        break;
+    }
+  }
+
+  // ── Render ──
+  function showChat() {
+    $('auth-screen').style.display = 'none';
+    $('chat-screen').classList.add('visible');
+    $('msg-input').focus();
+  }
+
+  function appendEntry(entry) {
+    if (entry.type === 'system') { appendSystem(entry.text); return; }
+    const div  = document.createElement('div');
+    div.className = 'msg';
+    const time = new Date(entry.ts).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    div.innerHTML = `
+      <div class="msg-meta">
+        <span class="msg-name" style="color:${entry.color}">${esc(entry.name)}</span>
+        <span class="msg-time">${time}</span>
+      </div>
+      <div class="msg-text">${esc(entry.text)}</div>`;
+    $('messages').appendChild(div);
+  }
+
+  function appendSystem(text) {
+    const div = document.createElement('div');
+    div.className = 'msg-system';
+    div.textContent = text;
+    $('messages').appendChild(div);
+  }
+
+  function updateOnline(online) {
+    $('online-list').innerHTML = online.map(u => `
+      <div class="online-item">
+        <div class="online-dot" style="background:${u.color}"></div>
+        <span style="color:${u.color};font-weight:${u.name===myName?'700':'400'}">${esc(u.name)}</span>
+      </div>`).join('');
+    $('online-count').textContent = `${online.length} online`;
+  }
+
+  let userScrolled = false;
+  $('messages').addEventListener('scroll', () => {
+    const el = $('messages');
+    userScrolled = el.scrollHeight - el.scrollTop - el.clientHeight > 60;
+  });
+  function scrollBottom(force = false) {
+    if (!userScrolled || force) $('messages').scrollTop = $('messages').scrollHeight;
+  }
+
+  function esc(s) {
+    return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  }
+
+  // ── Input ──
+  const input = $('msg-input');
+  input.addEventListener('input', () => {
+    input.style.height = 'auto';
+    input.style.height = Math.min(input.scrollHeight, 120) + 'px';
+  });
+  input.addEventListener('keydown', e => {
+    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMsg(); }
+  });
+  $('send-btn').onclick = sendMsg;
+
+  function sendMsg() {
+    const text = input.value.trim();
+    if (!text || !ws || ws.readyState !== 1) return;
+    ws.send(JSON.stringify({ type: 'chat', text }));
+    input.value = '';
+    input.style.height = 'auto';
+    input.focus();
+  }
+</script>
+</body>
+</html>

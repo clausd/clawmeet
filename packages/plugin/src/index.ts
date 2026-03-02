@@ -219,6 +219,14 @@ export default function register(api: any): void {
       chatTypes: ['group'],
     },
 
+    // Tell OpenClaw to treat any target string as a direct id (no directory lookup).
+    // ClawMeet rooms are addressed by topic name or account id — no user directory exists.
+    messaging: {
+      targetResolver: {
+        looksLikeId: () => true,
+      },
+    },
+
     config: {
       listAccountIds: (cfg: PluginConfig): string[] =>
         Object.keys(cfg?.channels?.clawmeet?.accounts ?? {}),
@@ -228,8 +236,8 @@ export default function register(api: any): void {
     },
 
     gateway: {
-      start: async (ctx: any, accountId: string): Promise<void> => {
-        const account = ctx.config?.channels?.clawmeet?.accounts?.[accountId];
+      startAccount: async (ctx: any): Promise<void> => {
+        const { accountId, account } = ctx;
         if (!account) {
           api.logger?.warn(`[clawmeet] No config found for account "${accountId}"`);
           return;
@@ -241,22 +249,52 @@ export default function register(api: any): void {
         connect(api, ctx, accountId, account);
       },
 
-      stop: async (_ctx: any, accountId: string): Promise<void> => {
-        stopAccount(accountId);
-        api.logger?.info(`[clawmeet:${accountId}] Stopped`);
+      stopAccount: async (ctx: any): Promise<void> => {
+        stopAccount(ctx.accountId);
+        api.logger?.info(`[clawmeet:${ctx.accountId}] Stopped`);
       },
     },
 
     outbound: {
       deliveryMode: 'direct' as const,
 
-      sendText: async (ctx: any, text: string): Promise<{ ok: boolean; error?: string }> => {
-        const state = connections.get(ctx.accountId);
-        if (!state?.ws || state.ws.readyState !== WebSocket.OPEN) {
-          return { ok: false, error: 'Not connected to ClawMeet room' };
+      // Resolve "general" (topic name) or "default" (account id) → account id
+      resolveTarget: (params: any): { ok: true; to: string } | { ok: false; error: Error } => {
+        const accounts: Record<string, AccountConfig> =
+          params.cfg?.channels?.clawmeet?.accounts ?? {};
+        const { to } = params;
+        // Match by account id
+        if (to && accounts[to]) return { ok: true, to };
+        // Match by topic name
+        for (const [accountId, account] of Object.entries(accounts)) {
+          if (account.topic === to) return { ok: true, to: accountId };
         }
+        // Fallback to 'default' if only one account or no match
+        const ids = Object.keys(accounts);
+        if (ids.length === 1) return { ok: true, to: ids[0] };
+        return { ok: false, error: new Error(`Unknown ClawMeet target "${to}"`) };
+      },
+
+      sendText: async (ctx: any): Promise<{ channel: string; messageId: string }> => {
+        const accountId = ctx.accountId ?? ctx.to;
+        const state = connections.get(accountId);
+        if (!state?.ws || state.ws.readyState !== WebSocket.OPEN) {
+          throw new Error(`Not connected to ClawMeet room (account: ${accountId})`);
+        }
+        state.ws.send(JSON.stringify({ type: 'chat', text: ctx.text }));
+        return { channel: 'clawmeet', messageId: `clawmeet-${Date.now()}` };
+      },
+
+      // ClawMeet is text-only; send media as a caption + URL fallback
+      sendMedia: async (ctx: any): Promise<{ channel: string; messageId: string }> => {
+        const accountId = ctx.accountId ?? ctx.to;
+        const state = connections.get(accountId);
+        if (!state?.ws || state.ws.readyState !== WebSocket.OPEN) {
+          throw new Error(`Not connected to ClawMeet room (account: ${accountId})`);
+        }
+        const text = [ctx.text, ctx.mediaUrl].filter(Boolean).join(' ') || '(media)';
         state.ws.send(JSON.stringify({ type: 'chat', text }));
-        return { ok: true };
+        return { channel: 'clawmeet', messageId: `clawmeet-${Date.now()}` };
       },
     },
   };

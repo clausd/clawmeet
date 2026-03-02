@@ -68,6 +68,8 @@ const BACKOFF_DELAYS = [1_000, 2_000, 4_000, 8_000, 16_000, 30_000];
 
 const connections = new Map<string, ConnectionState>();
 
+let pluginRuntime: any;
+
 function makeState(): ConnectionState {
   return { ws: null, backoffIndex: 0, reconnectTimer: null, stopped: false, pingInterval: null };
 }
@@ -126,9 +128,11 @@ function connect(api: any, ctx: any, accountId: string, account: AccountConfig):
         break;
 
       case 'chat':
-        // Ignore own messages
         if (msg.name === displayName) break;
-        dispatchMessage(ctx, accountId, msg);
+        // fire-and-forget — don't block WS message loop
+        dispatchMessage(api, ctx, accountId, msg, state).catch((err: Error) =>
+          api.logger?.error(`[clawmeet:${accountId}] Dispatch failed: ${err.message}`)
+        );
         break;
 
       // 'system', 'online', 'welcome' — no action needed for these in the plugin
@@ -189,20 +193,54 @@ function stopAccount(accountId: string): void {
 
 // ── Message dispatch to OpenClaw agent ──────────────────────────────────────
 
-function dispatchMessage(ctx: any, accountId: string, msg: any): void {
+async function dispatchMessage(
+  api: any,
+  ctx: any,
+  accountId: string,
+  msg: any,
+  state: ConnectionState
+): Promise<void> {
   const senderId = `clawmeet:${accountId}:${msg.name}`;
-  ctx.inbound?.dispatch({
-    senderId,
-    text: msg.text,
-    channel: 'group',
-    accountId,
-    meta: { color: msg.color, ts: msg.ts },
+
+  const { finalizeInboundContext, dispatchReplyWithBufferedBlockDispatcher } =
+    pluginRuntime.channel.reply;
+  const { recordInboundSession } = pluginRuntime.channel.session;
+
+  const ctxPayload = finalizeInboundContext({
+    Body:        msg.text,
+    From:        senderId,
+    To:          accountId,
+    AccountId:   accountId,
+    SessionKey:  `clawmeet-${accountId}-${msg.name}`,
+    ChatType:    'group',
+    Provider:    'clawmeet',
+    SenderName:  msg.name,
+    Timestamp:   msg.ts ?? Date.now(),
+  });
+
+  recordInboundSession(ctxPayload);
+
+  await dispatchReplyWithBufferedBlockDispatcher({
+    ctx: ctxPayload,
+    cfg: ctx.cfg,
+    dispatcherOptions: {
+      deliver: async (reply: any) => {
+        const text = typeof reply === 'string' ? reply : (reply.text ?? String(reply));
+        if (state.ws?.readyState === WebSocket.OPEN) {
+          state.ws.send(JSON.stringify({ type: 'chat', text }));
+        }
+      },
+      onError: (err: Error) => {
+        api.logger?.error(`[clawmeet:${accountId}] Dispatch error: ${err.message}`);
+      },
+    },
   });
 }
 
 // ── Plugin export ────────────────────────────────────────────────────────────
 
 export default function register(api: any): void {
+  pluginRuntime = api.runtime;
   const plugin = {
     id: 'clawmeet',
 
@@ -236,11 +274,8 @@ export default function register(api: any): void {
     },
 
     gateway: {
-      // Using legacy start(ctx, accountId) signature — ctx has inbound dispatch capability.
-      // If OpenClaw ever removes the legacy shim, switch to startAccount + ctx.runtime.channel.reply.
-      start: async (ctx: any, accountId: string): Promise<void> => {
-        const account: AccountConfig | undefined =
-          ctx.cfg?.channels?.clawmeet?.accounts?.[accountId];
+      startAccount: async (ctx: any): Promise<void> => {
+        const { accountId, account, abortSignal } = ctx;
         if (!account) {
           api.logger?.warn(`[clawmeet] No config found for account "${accountId}"`);
           return;
@@ -250,11 +285,18 @@ export default function register(api: any): void {
           return;
         }
         connect(api, ctx, accountId, account);
+
+        // Keep startAccount pending until gateway signals shutdown.
+        // Returning early causes the supervisor to read it as a crash and restart-loop.
+        await new Promise<void>((resolve) => {
+          if (abortSignal.aborted) resolve();
+          else abortSignal.addEventListener('abort', () => resolve(), { once: true });
+        });
       },
 
-      stop: async (ctx: any, accountId: string): Promise<void> => {
-        stopAccount(accountId);
-        api.logger?.info(`[clawmeet:${accountId}] Stopped`);
+      stopAccount: async (ctx: any): Promise<void> => {
+        stopAccount(ctx.accountId);
+        api.logger?.info(`[clawmeet:${ctx.accountId}] Stopped`);
       },
     },
 

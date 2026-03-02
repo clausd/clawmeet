@@ -204,7 +204,6 @@ async function dispatchMessage(
 
   const { finalizeInboundContext, dispatchReplyWithBufferedBlockDispatcher } =
     pluginRuntime.channel.reply;
-  const { recordInboundSession } = pluginRuntime.channel.session;
 
   const ctxPayload = finalizeInboundContext({
     Body:        msg.text,
@@ -217,8 +216,6 @@ async function dispatchMessage(
     SenderName:  msg.name,
     Timestamp:   msg.ts ?? Date.now(),
   });
-
-  recordInboundSession(ctxPayload);
 
   await dispatchReplyWithBufferedBlockDispatcher({
     ctx: ctxPayload,

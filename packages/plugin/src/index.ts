@@ -236,8 +236,11 @@ export default function register(api: any): void {
     },
 
     gateway: {
-      startAccount: async (ctx: any): Promise<void> => {
-        const { accountId, account } = ctx;
+      // Using legacy start(ctx, accountId) signature — ctx has inbound dispatch capability.
+      // If OpenClaw ever removes the legacy shim, switch to startAccount + ctx.runtime.channel.reply.
+      start: async (ctx: any, accountId: string): Promise<void> => {
+        const account: AccountConfig | undefined =
+          ctx.cfg?.channels?.clawmeet?.accounts?.[accountId];
         if (!account) {
           api.logger?.warn(`[clawmeet] No config found for account "${accountId}"`);
           return;
@@ -249,9 +252,9 @@ export default function register(api: any): void {
         connect(api, ctx, accountId, account);
       },
 
-      stopAccount: async (ctx: any): Promise<void> => {
-        stopAccount(ctx.accountId);
-        api.logger?.info(`[clawmeet:${ctx.accountId}] Stopped`);
+      stop: async (ctx: any, accountId: string): Promise<void> => {
+        stopAccount(accountId);
+        api.logger?.info(`[clawmeet:${accountId}] Stopped`);
       },
     },
 

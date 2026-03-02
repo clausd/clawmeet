@@ -146,7 +146,6 @@ function stopAccount(accountId) {
 async function dispatchMessage(api, ctx, accountId, msg, state) {
     const senderId = `clawmeet:${accountId}:${msg.name}`;
     const { finalizeInboundContext, dispatchReplyWithBufferedBlockDispatcher } = pluginRuntime.channel.reply;
-    const { recordInboundSession } = pluginRuntime.channel.session;
     const ctxPayload = finalizeInboundContext({
         Body: msg.text,
         From: senderId,
@@ -158,7 +157,6 @@ async function dispatchMessage(api, ctx, accountId, msg, state) {
         SenderName: msg.name,
         Timestamp: msg.ts ?? Date.now(),
     });
-    recordInboundSession(ctxPayload);
     await dispatchReplyWithBufferedBlockDispatcher({
         ctx: ctxPayload,
         cfg: ctx.cfg,

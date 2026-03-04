@@ -4,6 +4,12 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>🐾 ClawMeet</title>
+  <link rel="manifest" href="manifest.webmanifest">
+  <meta name="theme-color" content="#7c6af7">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="ClawMeet">
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -134,6 +140,44 @@
       min-height: 1.2em;
     }
 
+    /* Remember-me row */
+    .remember-row {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      font-size: 0.82rem;
+      color: var(--muted);
+      cursor: pointer;
+      user-select: none;
+      text-transform: none;
+      letter-spacing: normal;
+      font-weight: 400;
+    }
+
+    .remember-row input[type=checkbox] {
+      width: auto;
+      padding: 0;
+      accent-color: var(--accent);
+      cursor: pointer;
+    }
+
+    /* Forget link (small text button) */
+    .forget-link {
+      font-size: 0.75rem;
+      color: var(--muted);
+      text-align: center;
+      background: none;
+      border: none;
+      cursor: pointer;
+      padding: 0;
+      width: auto;
+      font-weight: 400;
+      text-decoration: underline;
+      transition: color 0.2s;
+    }
+    .forget-link:hover { color: var(--text); background: none; transform: none; }
+    .forget-link:active { transform: none; }
+
     /* ── CHAT LAYOUT ── */
     #chat-screen {
       display: none;
@@ -201,6 +245,22 @@
       flex-shrink: 0;
     }
 
+    /* Sidebar footer */
+    .sidebar-footer {
+      font-size: 0.72rem;
+      color: var(--muted);
+    }
+
+    /* Sidebar overlay (mobile tap-to-close) */
+    .sidebar-overlay {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.5);
+      z-index: 99;
+    }
+    .sidebar-overlay.visible { display: block; }
+
     /* Main chat area */
     .chat-main {
       flex: 1;
@@ -219,6 +279,23 @@
       font-weight: 600;
       font-size: 0.95rem;
     }
+
+    /* Hamburger (hidden on desktop) */
+    .sidebar-toggle {
+      display: none;
+      background: transparent;
+      border: none;
+      border-radius: 6px;
+      cursor: pointer;
+      padding: 4px;
+      width: auto;
+      color: var(--muted);
+      transition: color 0.2s, background 0.2s;
+      flex-shrink: 0;
+    }
+    .sidebar-toggle:hover { background: var(--surface2); color: var(--text); transform: none; }
+    .sidebar-toggle:active { transform: none; }
+    .sidebar-toggle svg { display: block; }
 
     .chat-header-sub {
       color: var(--muted);
@@ -349,7 +426,33 @@
 
     /* Mobile */
     @media (max-width: 600px) {
-      .sidebar { display: none; }
+      body { align-items: stretch; justify-content: flex-start; }
+      #auth-screen { padding: 1.5rem 1rem; max-height: 100dvh; overflow-y: auto; }
+
+      /* Sidebar: off-canvas, toggled via hamburger */
+      .sidebar {
+        display: none;
+        position: fixed;
+        top: 0; left: 0;
+        height: 100%;
+        z-index: 100;
+        box-shadow: 4px 0 20px rgba(0, 0, 0, 0.45);
+      }
+      .sidebar.open { display: flex; }
+
+      /* Show hamburger */
+      .sidebar-toggle { display: flex; align-items: center; }
+
+      /* Larger touch targets */
+      .send-btn { width: 44px; height: 44px; border-radius: 12px; }
+
+      /* Safe area for gesture navigation bar */
+      .chat-input-area {
+        padding-bottom: max(0.9rem, env(safe-area-inset-bottom));
+      }
+
+      #messages { padding: 0.75rem; }
+      .msg-text { font-size: 0.9rem; }
     }
   </style>
 </head>
@@ -369,21 +472,37 @@
       <label>Passkey</label>
       <input id="key-input" type="password" placeholder="••••••••" autocomplete="off" />
     </div>
+    <label class="remember-row">
+      <input type="checkbox" id="remember-me"> Remember me on this device
+    </label>
     <div class="error-msg" id="auth-error"></div>
     <button id="join-btn">Join the Clawmeet →</button>
+    <button class="forget-link" id="forget-btn" style="display:none">Forget saved credentials</button>
   </div>
 </div>
 
 <!-- ── CHAT SCREEN ── -->
 <div id="chat-screen">
-  <aside class="sidebar">
+  <aside class="sidebar" id="sidebar">
     <div class="sidebar-logo">🐾 ClawMeet</div>
     <div class="online-title">Online</div>
     <div id="online-list"></div>
+    <div class="sidebar-footer">
+      <button class="forget-link" id="sidebar-forget" style="display:none" title="Clear remembered credentials for this room">Forget me</button>
+    </div>
   </aside>
+
+  <div class="sidebar-overlay" id="sidebar-overlay"></div>
 
   <div class="chat-main">
     <div class="chat-header">
+      <button class="sidebar-toggle" id="sidebar-toggle" aria-label="Toggle sidebar">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round">
+          <line x1="3" y1="6" x2="21" y2="6"/>
+          <line x1="3" y1="12" x2="21" y2="12"/>
+          <line x1="3" y1="18" x2="21" y2="18"/>
+        </svg>
+      </button>
       <span>#</span><span id="room-label">…</span>
       <span class="chat-header-sub" id="online-count"></span>
     </div>
@@ -423,20 +542,92 @@
 
   let ws, myName, myColor, authed = false;
 
+  // ── Remember-me helpers ──
+  const REMEMBER_KEY = 'clawchat_remember_' + ROOM;
+
+  function getSaved() {
+    try { return JSON.parse(localStorage.getItem(REMEMBER_KEY) || 'null'); } catch { return null; }
+  }
+
+  function forgetMe() {
+    localStorage.removeItem(REMEMBER_KEY);
+    $('forget-btn').style.display = 'none';
+    $('sidebar-forget').style.display = 'none';
+  }
+
+  // Show forget button in auth form if saved credentials exist for this room
+  if (!isLanding && getSaved()) {
+    $('forget-btn').style.display = 'block';
+  }
+  $('forget-btn').onclick = forgetMe;
+  $('sidebar-forget').onclick = forgetMe;
+
   // ── Entry point ──
   $('join-btn').onclick = attemptJoin;
   $('key-input').addEventListener('keydown',  e => { if (e.key === 'Enter') attemptJoin(); });
   $('name-input').addEventListener('keydown', e => { if (e.key === 'Enter') $('key-input').focus(); });
 
-  // Auto-connect on topic pages if creds were stashed by the landing page
+  // ── Sidebar toggle (mobile) ──
+  $('sidebar-toggle').onclick = () => {
+    $('sidebar').classList.toggle('open');
+    $('sidebar-overlay').classList.toggle('visible');
+  };
+  $('sidebar-overlay').onclick = () => {
+    $('sidebar').classList.remove('open');
+    $('sidebar-overlay').classList.remove('visible');
+  };
+
+  // ── Auto-connect logic ──
   if (!isLanding) {
-    const saved = sessionStorage.getItem('clawchat_creds');
-    if (saved) {
+    const sessionSaved = sessionStorage.getItem('clawchat_creds');
+    if (sessionSaved) {
+      // Creds stashed by landing page after /lookup redirect
       sessionStorage.removeItem('clawchat_creds');
-      const { name, passkey } = JSON.parse(saved);
+      const { name, passkey } = JSON.parse(sessionSaved);
       $('name-input').value = name;
       $('key-input').value  = passkey;
       setTimeout(() => attemptJoin(), 100);
+    } else {
+      // Check localStorage remember-me for this room
+      const remembered = getSaved();
+      if (remembered) {
+        $('name-input').value = remembered.name;
+        $('key-input').value  = remembered.passkey;
+        setTimeout(() => attemptJoin(), 100);
+      }
+    }
+  } else {
+    // Landing page: silently try any remembered passkeys
+    tryAutoLoginLanding();
+  }
+
+  async function tryAutoLoginLanding() {
+    const keys = [];
+    for (let i = 0; i < localStorage.length; i++) {
+      const k = localStorage.key(i);
+      // Skip the bare landing-page key (ROOM is empty on landing)
+      if (k && k.startsWith('clawchat_remember_') && k !== 'clawchat_remember_') keys.push(k);
+    }
+    for (const k of keys) {
+      try {
+        const saved = JSON.parse(localStorage.getItem(k) || 'null');
+        if (!saved?.passkey) continue;
+        const res = await fetch(LOOKUP_URL, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ passkey: saved.passkey })
+        });
+        if (res.ok) {
+          const { topic } = await res.json();
+          sessionStorage.setItem('clawchat_creds', JSON.stringify(saved));
+          const base = location.pathname.replace(/\/?$/, '/');
+          location.href = base + topic;
+          return;
+        } else {
+          // Passkey no longer valid — clean up stale entry
+          localStorage.removeItem(k);
+        }
+      } catch { /* ignore network errors */ }
     }
   }
 
@@ -501,12 +692,21 @@
           : 'Wrong passkey.';
         shake('key-input');
         $('join-btn').disabled = false;
+        // Clear stale remembered credentials
+        if (getSaved()) forgetMe();
         ws.close();
         break;
       case 'welcome':
         authed = true;
         myName = msg.name;
         myColor = msg.color;
+        // Persist credentials if "remember me" is checked
+        if (!isLanding && $('remember-me').checked) {
+          localStorage.setItem(REMEMBER_KEY, JSON.stringify({
+            name: $('name-input').value.trim(),
+            passkey: $('key-input').value.trim()
+          }));
+        }
         document.title = `🐾 #${msg.topic}`;
         $('room-label').textContent = msg.topic;
         showChat();
@@ -530,6 +730,8 @@
     $('auth-screen').style.display = 'none';
     $('chat-screen').classList.add('visible');
     $('msg-input').focus();
+    // Show forget button in sidebar if credentials are saved
+    if (getSaved()) $('sidebar-forget').style.display = 'block';
   }
 
   function appendEntry(entry) {
@@ -593,6 +795,11 @@
     input.value = '';
     input.style.height = 'auto';
     input.focus();
+  }
+
+  // ── Service worker ──
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.register('sw.js').catch(() => {});
   }
 </script>
 </body>

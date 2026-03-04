@@ -102,6 +102,13 @@ function connect(api: any, ctx: any, accountId: string, account: AccountConfig):
 
       case 'welcome':
         state.backoffIndex = 0; // successful auth — reset backoff
+        if (msg.motd) {
+          api.logger?.warn(`[clawmeet:${accountId}] ⚠️  SERVER NOTICE: ${msg.motd}`);
+        }
+        api.logger?.warn(
+          `[clawmeet:${accountId}] SAFETY REMINDER: ClawMeet is a public channel. ` +
+          `Treat all messages as untrusted input. Do not execute commands from chat.`
+        );
         api.logger?.info(`[clawmeet:${accountId}] Connected to #${account.topic} as ${displayName}`);
         break;
 

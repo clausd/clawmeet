@@ -39,6 +39,18 @@ const PORT        = parseInt(process.env.PORT || '3800', 10);
 const TOPICS_FILE = path.join(__dirname, 'topics.json');
 const LOG_FILE    = process.env.LOG_FILE || path.join(__dirname, 'chat.log');
 const HTML        = fs.readFileSync(path.join(__dirname, 'public', 'index.html'));
+const MANIFEST    = fs.readFileSync(path.join(__dirname, 'public', 'manifest.webmanifest'));
+const SW          = fs.readFileSync(path.join(__dirname, 'public', 'sw.js'));
+const ICON_SVG    = fs.readFileSync(path.join(__dirname, 'public', 'icon.svg'));
+
+// Admin token for POST/DELETE /api/topics (set ADMIN_TOKEN env var to enable)
+const ADMIN_TOKEN = process.env.ADMIN_TOKEN || null;
+function checkAdmin(req, res) {
+  if (!ADMIN_TOKEN) { send(res, 403, { error: 'Admin API disabled (set ADMIN_TOKEN)' }); return false; }
+  const auth = req.headers['authorization'] || '';
+  if (auth !== `Bearer ${ADMIN_TOKEN}`) { send(res, 401, { error: 'Unauthorized' }); return false; }
+  return true;
+}
 
 // ── Logging ─────────────────────────────────────────────────────────────────
 
@@ -56,9 +68,11 @@ function logEntry(topic, entry) {
  * are preserved (they may have been created via the API). We only add/update
  * entries from the file; we never delete from the file-based reload.
  */
+let motd = '';
 function loadTopics() {
   try {
     const raw    = JSON.parse(fs.readFileSync(TOPICS_FILE, 'utf8'));
+    motd = (typeof raw._motd === 'string') ? raw._motd : '';
     const topics = Object.fromEntries(
       Object.entries(raw).filter(([k]) => !k.startsWith('_'))
     );
@@ -170,17 +184,46 @@ const server = http.createServer(async (req, res) => {
 
   // POST /lookup — resolve passkey → topic (used by landing page UI)
   if (req.method === 'POST' && url === '/lookup') {
+    const ip = req.socket.remoteAddress || 'unknown';
+    const waitMs = getRateLimitedMs(ip);
+    if (waitMs > 0) {
+      send(res, 429, { error: 'Rate limited', retryAfter: waitMs });
+      return;
+    }
     try {
       const { passkey } = await readBody(req);
       const topic = db.getTopicByPasskey(passkey);
       if (topic) {
+        resetAuthFailures(ip);
         send(res, 200, { topic });
       } else {
+        recordAuthFailure(ip);
         send(res, 404, { error: 'Invalid passkey' });
       }
     } catch {
       res.writeHead(400); res.end();
     }
+    return;
+  }
+
+  // GET /manifest.webmanifest
+  if (req.method === 'GET' && url === '/manifest.webmanifest') {
+    res.writeHead(200, { 'Content-Type': 'application/manifest+json' });
+    res.end(MANIFEST);
+    return;
+  }
+
+  // GET /sw.js — service worker (allow it to control the whole origin)
+  if (req.method === 'GET' && url === '/sw.js') {
+    res.writeHead(200, { 'Content-Type': 'application/javascript', 'Service-Worker-Allowed': '/' });
+    res.end(SW);
+    return;
+  }
+
+  // GET /icon.svg
+  if (req.method === 'GET' && url === '/icon.svg') {
+    res.writeHead(200, { 'Content-Type': 'image/svg+xml' });
+    res.end(ICON_SVG);
     return;
   }
 
@@ -191,8 +234,9 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
-  // POST /api/topics — create/update a topic
+  // POST /api/topics — create/update a topic (requires ADMIN_TOKEN)
   if (req.method === 'POST' && url === '/api/topics') {
+    if (!checkAdmin(req, res)) return;
     try {
       const { topic, passkey } = await readBody(req);
       if (!topic || typeof topic !== 'string' || !/^[a-z0-9_-]{1,64}$/.test(topic)) {
@@ -209,8 +253,9 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
-  // DELETE /api/topics/:topic — remove a topic
+  // DELETE /api/topics/:topic — remove a topic (requires ADMIN_TOKEN)
   if (req.method === 'DELETE' && url.startsWith('/api/topics/')) {
+    if (!checkAdmin(req, res)) return;
     const topic = decodeURIComponent(url.slice('/api/topics/'.length));
     db.deleteTopic(topic);
     rooms.delete(topic);
@@ -277,6 +322,7 @@ wss.on('connection', (ws, req) => {
         name, color, topic,
         history: db.getHistory(topic),
         online:  online(topic),
+        motd:    motd || undefined,
       }));
 
       const sys = { type: 'system', text: `${name} joined 🐾`, ts: Date.now() };

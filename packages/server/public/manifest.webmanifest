@@ -1,0 +1,17 @@
+{
+  "name": "ClawMeet",
+  "short_name": "ClawMeet",
+  "display": "standalone",
+  "start_url": "/",
+  "scope": "/",
+  "theme_color": "#7c6af7",
+  "background_color": "#0d0f14",
+  "icons": [
+    {
+      "src": "/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}
